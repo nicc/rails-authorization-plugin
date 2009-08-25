@@ -157,6 +157,30 @@ module Authorization
           def authorizables_by( user )
             user.authorizables_for self
           end
+          
+          def always_has( role, args = {} )
+            raise ArgumentError, "role name must be a symbol" unless role.is_a? Symbol
+            
+            relationship = args.delete(:as) || role
+            role_name = role.to_s
+            
+            raise NamedAssociationDoesNotExist unless self.reflect_on_association relationship
+            raise ArgumentError, "Invalid key" if args.size > 0
+            
+            before_save_method_name = "always_has_vefore_save_for_#{role_name}".to_sym
+            after_save_method_name = "always_has_after_save_for_#{role_name}".to_sym
+            
+            define_method before_save_method_name do
+              self.accepts_no_role role_name, self.send(relationship)
+            end
+            
+            define_method after_save_method_name do
+              self.accepts_role role_name, self.send(relationship)
+            end
+            
+            before_save before_save_method_name
+            after_save after_save_method_name
+          end
 
           include Authorization::ObjectRolesTable::ModelExtensions::InstanceMethods
           include Authorization::Identity::ModelExtensions::InstanceMethods   # Provides all kinds of dynamic sugar via method_missing

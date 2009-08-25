@@ -40,4 +40,8 @@ module Authorization #:nodoc:
 
   class CannotGetAuthorizables < AuthorizationError
   end
+  
+  class NamedAssociationDoesNotExist < AuthorizationError
+  end
+  
 end
