@@ -158,24 +158,45 @@ module Authorization
             user.authorizables_for self
           end
           
+          # TODO:   refactor this into multiple, shorter methods
           def always_has( role, args = {} )
             raise ArgumentError, "role name must be a symbol" unless role.is_a? Symbol
             
             relationship = args.delete(:as) || role
             role_name = role.to_s
             
-            raise NamedAssociationDoesNotExist unless self.reflect_on_association relationship
+            association_reflection = self.reflect_on_association relationship
+            raise NamedAssociationDoesNotExist unless association_reflection || !association_reflection.belongs_to?
             raise ArgumentError, "Invalid key" if args.size > 0
             
-            before_save_method_name = "always_has_vefore_save_for_#{role_name}".to_sym
+            before_save_method_name = "always_has_before_save_for_#{role_name}".to_sym
             after_save_method_name = "always_has_after_save_for_#{role_name}".to_sym
             
             define_method before_save_method_name do
-              self.accepts_no_role role_name, self.send(relationship)
+              #  ok this is a little weird.  I need the old associated record to remove the role from it.
+              #  So I redo a find on this object id and traverse the association, removing the role for it
+              #  before saving the actual record (self).  Obv dont do this if it's a new record.
+              #  It's also optimised to save the old and new associated records as instance vars on the new one, 
+              #  and only redoes the roles if they differ.  The after_save then also has access to the instance vars.
+              
+              #  This is outside the unless so that nil == nil isn't a problem when deciding whether to update roles.
+              instance_variable_set "@new_#{role_name}_instance".to_sym, self.send(relationship)
+              
+              unless self.new_record?
+                instance_variable_set "@old_#{role_name}_instance".to_sym, self.class.find(self.id, :include => relationship).send(relationship)
+                
+                old_association = instance_variable_get("@old_#{role_name}_instance".to_sym)
+                new_association = instance_variable_get("@new_#{role_name}_instance".to_sym)
+                
+                self.accepts_no_role role_name, old_association unless new_association == old_association
+              end
             end
             
             define_method after_save_method_name do
-              self.accepts_role role_name, self.send(relationship)
+              old_association = instance_variable_get("@old_#{role_name}_instance".to_sym)
+              new_association = instance_variable_get("@new_#{role_name}_instance".to_sym)
+              
+              self.accepts_role role_name, new_association unless new_association == old_association
             end
             
             before_save before_save_method_name
