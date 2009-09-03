@@ -18,6 +18,10 @@ requirements are met:
    implement an accepts_role?(role, user) method. This requirement can
    be handled by using acts_as_authorizable in the model class.
 
+3. For authorizable objects that need to have a role maintained for the user 
+   that owns them for a specific relationship, use the always_has class method made
+   available by acts_as_authorizable.
+
 The authorization plugin provides the following:
 
 * A simple way of checking authorization at either the class or instance method
@@ -32,6 +36,9 @@ The authorization plugin provides the following:
 
 * Pick-and-choose a mixin for your desired level of database complexity. For
   all the features, you will want to use "object roles table" (see below)
+
+* The ability to have a predetermined role with an authorizable instance 
+  represented by an existing belongs_to relationship kept up to date for you.
 
 
 == Example Usage
@@ -258,6 +265,17 @@ on role you would add just the acts_as_authorizable mixin like this:
     acts_as_authorizable
 
   ...
+
+If you have a relationship with the User model on an authorizable model 
+that you would like kept up to date, use always_has as below, where an 'owner'
+role will always be kept current for a given Presentation instance:
+
+  class Presentation
+
+    belongs_to :user
+    always_has :owner, :as => :user   # always_has would assume a 
+                                      # relationship called 'owner' if
+                                      # you were to omit ':as => :user'
 
 You are done with the configuration!
 
